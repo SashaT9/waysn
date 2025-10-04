@@ -39,11 +39,9 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
         {
             // println!("[{}] {} (v{})", name, interface, version);
             if interface == wl_output::WlOutput::interface().name {
-                let idx = state.outputs.len();
-                let output =
-                    registry.bind::<wl_output::WlOutput, _, _>(name, version, qh, idx as u32);
+                let output = registry.bind::<wl_output::WlOutput, _, _>(name, version, qh, name);
                 state.outputs.insert(
-                    idx as u32,
+                    name,
                     OutputInfo {
                         output: output,
                         width: 0,
