@@ -1,17 +1,35 @@
+use std::collections::HashMap;
 use wayland_client::{
     protocol::{wl_output, wl_registry},
-    Connection, Dispatch, QueueHandle,
+    Connection, Dispatch, Proxy, QueueHandle,
 };
-struct AppData;
+
+struct OutputInfo {
+    output: wl_output::WlOutput,
+    width: i32,
+    height: i32,
+    refresh: i32,
+}
+struct AppData {
+    outputs: HashMap<u32, OutputInfo>,
+}
+impl AppData {
+    fn new() -> Self {
+        let app_data = Self {
+            outputs: HashMap::new(),
+        };
+        app_data
+    }
+}
 
 impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
     fn event(
-        _state: &mut Self,
+        state: &mut Self,
         registry: &wl_registry::WlRegistry,
         event: wl_registry::Event,
         _: &(),
         _: &Connection,
-        qh: &QueueHandle<AppData>,
+        qh: &QueueHandle<Self>,
     ) {
         if let wl_registry::Event::Global {
             name,
@@ -20,18 +38,29 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
         } = event
         {
             // println!("[{}] {} (v{})", name, interface, version);
-            if interface == "wl_output" {
-                registry.bind::<wl_output::WlOutput, _, _>(name, version, qh, ());
+            if interface == wl_output::WlOutput::interface().name {
+                let idx = state.outputs.len();
+                let output =
+                    registry.bind::<wl_output::WlOutput, _, _>(name, version, qh, idx as u32);
+                state.outputs.insert(
+                    idx as u32,
+                    OutputInfo {
+                        output: output,
+                        width: 0,
+                        height: 0,
+                        refresh: 0,
+                    },
+                );
             }
         }
     }
 }
-impl Dispatch<wl_output::WlOutput, ()> for AppData {
+impl Dispatch<wl_output::WlOutput, u32> for AppData {
     fn event(
-        _state: &mut Self,
+        state: &mut Self,
         _proxy: &wl_output::WlOutput,
         event: wl_output::Event,
-        _: &(),
+        idx: &u32,
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
@@ -45,7 +74,12 @@ impl Dispatch<wl_output::WlOutput, ()> for AppData {
                 refresh,
                 ..
             } => {
-                println!("{}x{} @{}Hz", width, height, refresh / 1000);
+                let Some(output) = state.outputs.get_mut(idx) else {
+                    todo!();
+                };
+                output.width = width;
+                output.height = height;
+                output.refresh = refresh / 1000;
             }
             _ => {}
         }
@@ -58,6 +92,10 @@ fn main() {
     let mut event_queue = conn.new_event_queue();
     let qh = event_queue.handle();
     let _registry = display.get_registry(&qh, ());
-    event_queue.roundtrip(&mut AppData).unwrap();
-    event_queue.roundtrip(&mut AppData).unwrap();
+    let mut state = AppData::new();
+    event_queue.roundtrip(&mut state).unwrap();
+    event_queue.roundtrip(&mut state).unwrap();
+    for (_idx, output) in state.outputs.into_iter() {
+        println!("{}x{} @{}Hz", output.width, output.height, output.refresh);
+    }
 }
