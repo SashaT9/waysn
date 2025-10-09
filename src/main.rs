@@ -3,6 +3,7 @@ use wayland_client::{
     protocol::{wl_output, wl_registry},
     Connection, Dispatch, Proxy, QueueHandle,
 };
+use wayland_protocols_wlr::gamma_control::v1::client::zwlr_gamma_control_manager_v1;
 
 struct OutputInfo {
     output: wl_output::WlOutput,
@@ -12,11 +13,13 @@ struct OutputInfo {
 }
 struct AppData {
     outputs: HashMap<u32, OutputInfo>,
+    manager: Option<zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1>,
 }
 impl AppData {
     fn new() -> Self {
         let app_data = Self {
             outputs: HashMap::new(),
+            manager: None,
         };
         app_data
     }
@@ -50,6 +53,18 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
                     },
                 );
             }
+            if interface
+                == zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1::interface().name
+            {
+                let manager = registry
+                    .bind::<zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1, _, _>(
+                        name,
+                        version,
+                        qh,
+                        (),
+                    );
+                state.manager = Some(manager);
+            }
         }
     }
 }
@@ -81,6 +96,19 @@ impl Dispatch<wl_output::WlOutput, u32> for AppData {
             }
             _ => {}
         }
+    }
+}
+
+// actually not used. Written so that bind does not complain
+impl Dispatch<zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1, ()> for AppData {
+    fn event(
+        _: &mut Self,
+        _: &zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1,
+        _: zwlr_gamma_control_manager_v1::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
     }
 }
 
