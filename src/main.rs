@@ -4,12 +4,11 @@ use wayland_client::{
     Connection, Dispatch, Proxy, QueueHandle,
 };
 use wayland_protocols_wlr::gamma_control::v1::client::zwlr_gamma_control_manager_v1;
+use wayland_protocols_wlr::gamma_control::v1::client::zwlr_gamma_control_v1;
 
 struct OutputInfo {
     output: wl_output::WlOutput,
-    width: i32,
-    height: i32,
-    refresh: i32,
+    gamma: Option<zwlr_gamma_control_v1::ZwlrGammaControlV1>,
 }
 struct AppData {
     outputs: HashMap<u32, OutputInfo>,
@@ -47,9 +46,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
                     name,
                     OutputInfo {
                         output: output,
-                        width: 0,
-                        height: 0,
-                        refresh: 0,
+                        gamma: None,
                     },
                 );
             }
@@ -70,32 +67,13 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
 }
 impl Dispatch<wl_output::WlOutput, u32> for AppData {
     fn event(
-        state: &mut Self,
+        _state: &mut Self,
         _proxy: &wl_output::WlOutput,
-        event: wl_output::Event,
-        idx: &u32,
-        _: &Connection,
+        _event: wl_output::Event,
+        _idx: &u32,
+        _conn: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        match event {
-            wl_output::Event::Geometry { make, model, .. } => {
-                println!("make={} model={}", make, model);
-            }
-            wl_output::Event::Mode {
-                width,
-                height,
-                refresh,
-                ..
-            } => {
-                let Some(output) = state.outputs.get_mut(idx) else {
-                    todo!();
-                };
-                output.width = width;
-                output.height = height;
-                output.refresh = refresh / 1000;
-            }
-            _ => {}
-        }
     }
 }
 
@@ -111,6 +89,17 @@ impl Dispatch<zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1, ()> for 
     ) {
     }
 }
+impl Dispatch<zwlr_gamma_control_v1::ZwlrGammaControlV1, ()> for AppData {
+    fn event(
+        _: &mut Self,
+        _: &zwlr_gamma_control_v1::ZwlrGammaControlV1,
+        _: zwlr_gamma_control_v1::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+    }
+}
 
 fn main() {
     let conn = Connection::connect_to_env().unwrap();
@@ -120,8 +109,10 @@ fn main() {
     let _registry = display.get_registry(&qh, ());
     let mut state = AppData::new();
     event_queue.roundtrip(&mut state).unwrap();
-    event_queue.roundtrip(&mut state).unwrap();
-    for (_idx, output) in state.outputs.into_iter() {
-        println!("{}x{} @{}Hz", output.width, output.height, output.refresh);
+    if let Some(manager) = &state.manager {
+        for (_, output) in state.outputs.iter_mut() {
+            let gamma = manager.get_gamma_control(&output.output, &qh, ());
+            output.gamma = Some(gamma);
+        }
     }
 }
