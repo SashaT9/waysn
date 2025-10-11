@@ -117,6 +117,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
+name = "tempergb"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "681bde77f9c90db65fa3259ece4f5b99725437560572010554f9f470a28f823f"
+
+[[package]]
 name = "unicode-ident"
 version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -196,6 +202,7 @@ dependencies = [
 name = "waysn"
 version = "0.1.0"
 dependencies = [
+ "tempergb",
  "wayland-client",
  "wayland-protocols-wlr",
 ]

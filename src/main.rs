@@ -9,6 +9,7 @@ use wayland_protocols_wlr::gamma_control::v1::client::zwlr_gamma_control_v1;
 struct OutputInfo {
     output: wl_output::WlOutput,
     gamma: Option<zwlr_gamma_control_v1::ZwlrGammaControlV1>,
+    ramp_size: u32,
 }
 struct AppData {
     outputs: HashMap<u32, OutputInfo>,
@@ -47,6 +48,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
                     OutputInfo {
                         output: output,
                         gamma: None,
+                        ramp_size: 0,
                     },
                 );
             }
@@ -89,15 +91,20 @@ impl Dispatch<zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1, ()> for 
     ) {
     }
 }
-impl Dispatch<zwlr_gamma_control_v1::ZwlrGammaControlV1, ()> for AppData {
+impl Dispatch<zwlr_gamma_control_v1::ZwlrGammaControlV1, u32> for AppData {
     fn event(
-        _: &mut Self,
+        state: &mut Self,
         _: &zwlr_gamma_control_v1::ZwlrGammaControlV1,
-        _: zwlr_gamma_control_v1::Event,
-        _: &(),
+        event: zwlr_gamma_control_v1::Event,
+        idx: &u32,
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
+        if let zwlr_gamma_control_v1::Event::GammaSize { size } = event {
+            if let Some(output_info) = state.outputs.get_mut(idx) {
+                output_info.ramp_size = size;
+            }
+        }
     }
 }
 
@@ -110,9 +117,30 @@ fn main() {
     let mut state = AppData::new();
     event_queue.roundtrip(&mut state).unwrap();
     if let Some(manager) = &state.manager {
-        for (_, output) in state.outputs.iter_mut() {
-            let gamma = manager.get_gamma_control(&output.output, &qh, ());
+        for (idx, output) in state.outputs.iter_mut() {
+            let gamma = manager.get_gamma_control(&output.output, &qh, *idx);
             output.gamma = Some(gamma);
         }
     }
+    event_queue.roundtrip(&mut state).unwrap();
+}
+
+fn build_gamma_table(ramp_size: u32, rgb: tempergb::Color) -> Vec<u16> {
+    let r_16bit = rgb.r() as u16 * 257;
+    let g_16bit = rgb.g() as u16 * 257;
+    let b_16bit = rgb.b() as u16 * 257;
+    let mut table = Vec::with_capacity(ramp_size as usize * 3);
+    for i in 0..ramp_size {
+        let fraction = i as f32 / (ramp_size - 1) as f32;
+        table.push((r_16bit as f32 * fraction) as u16);
+    }
+    for i in 0..ramp_size {
+        let fraction = i as f32 / (ramp_size - 1) as f32;
+        table.push((g_16bit as f32 * fraction) as u16);
+    }
+    for i in 0..ramp_size {
+        let fraction = i as f32 / (ramp_size - 1) as f32;
+        table.push((b_16bit as f32 * fraction) as u16);
+    }
+    table
 }
