@@ -1,4 +1,8 @@
 use std::collections::HashMap;
+use std::io::Seek;
+use std::io::Write;
+use std::os::fd::AsFd;
+use tempergb::rgb_from_temperature;
 use wayland_client::{
     protocol::{wl_output, wl_registry},
     Connection, Dispatch, Proxy, QueueHandle,
@@ -103,6 +107,7 @@ impl Dispatch<zwlr_gamma_control_v1::ZwlrGammaControlV1, u32> for AppData {
         if let zwlr_gamma_control_v1::Event::GammaSize { size } = event {
             if let Some(output_info) = state.outputs.get_mut(idx) {
                 output_info.ramp_size = size;
+                println!("{}", size);
             }
         }
     }
@@ -123,24 +128,39 @@ fn main() {
         }
     }
     event_queue.roundtrip(&mut state).unwrap();
+    if state.manager.is_none() {
+        println!("YOU ARE NOOB T.T");
+    }
+    let mut temp_files = Vec::new();
+    for (_idx, output) in state.outputs.iter_mut() {
+        let kelvin = 5000;
+        let size = output.ramp_size as usize;
+        let mut table = vec![0u16; size * 3];
+        fill_gamma_table(&mut table, output.ramp_size, rgb_from_temperature(kelvin));
+        let mut f = tempfile::tempfile().expect("1");
+        let byte_slice =
+            unsafe { std::slice::from_raw_parts(table.as_ptr() as *const u8, table.len() * 2) };
+        f.write_all(byte_slice).expect("2");
+        f.rewind().expect("3");
+        let fd = f.as_fd();
+        if let Some(gamma) = &output.gamma {
+            gamma.set_gamma(fd);
+        }
+        temp_files.push(f);
+    }
+    conn.flush().expect("4");
+    std::thread::sleep(std::time::Duration::from_secs(10));
 }
 
-fn build_gamma_table(ramp_size: u32, rgb: tempergb::Color) -> Vec<u16> {
+fn fill_gamma_table(table: &mut [u16], ramp_size: u32, rgb: tempergb::Color) {
     let r_16bit = rgb.r() as u16 * 257;
     let g_16bit = rgb.g() as u16 * 257;
     let b_16bit = rgb.b() as u16 * 257;
-    let mut table = Vec::with_capacity(ramp_size as usize * 3);
-    for i in 0..ramp_size {
+    let size = ramp_size as usize;
+    for i in 0..size {
         let fraction = i as f32 / (ramp_size - 1) as f32;
-        table.push((r_16bit as f32 * fraction) as u16);
+        table[i] = (r_16bit as f32 * fraction) as u16;
+        table[i + size] = (g_16bit as f32 * fraction) as u16;
+        table[i + 2 * size] = (b_16bit as f32 * fraction) as u16;
     }
-    for i in 0..ramp_size {
-        let fraction = i as f32 / (ramp_size - 1) as f32;
-        table.push((g_16bit as f32 * fraction) as u16);
-    }
-    for i in 0..ramp_size {
-        let fraction = i as f32 / (ramp_size - 1) as f32;
-        table.push((b_16bit as f32 * fraction) as u16);
-    }
-    table
 }
