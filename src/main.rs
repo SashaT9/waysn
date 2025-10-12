@@ -1,14 +1,14 @@
 use std::collections::HashMap;
-use std::io::Seek;
-use std::io::Write;
+use std::io::{Seek, Write};
 use std::os::fd::AsFd;
 use tempergb::rgb_from_temperature;
 use wayland_client::{
     protocol::{wl_output, wl_registry},
     Connection, Dispatch, Proxy, QueueHandle,
 };
-use wayland_protocols_wlr::gamma_control::v1::client::zwlr_gamma_control_manager_v1;
-use wayland_protocols_wlr::gamma_control::v1::client::zwlr_gamma_control_v1;
+use wayland_protocols_wlr::gamma_control::v1::client::{
+    zwlr_gamma_control_manager_v1, zwlr_gamma_control_v1,
+};
 
 struct OutputInfo {
     output: wl_output::WlOutput,
@@ -133,13 +133,12 @@ fn main() {
     }
     let mut temp_files = Vec::new();
     for (_idx, output) in state.outputs.iter_mut() {
-        let kelvin = 5000;
+        let kelvin = 4000;
         let size = output.ramp_size as usize;
         let mut table = vec![0u16; size * 3];
         fill_gamma_table(&mut table, output.ramp_size, rgb_from_temperature(kelvin));
         let mut f = tempfile::tempfile().expect("1");
-        let byte_slice =
-            unsafe { std::slice::from_raw_parts(table.as_ptr() as *const u8, table.len() * 2) };
+        let byte_slice: &[u8] = bytemuck::cast_slice(&table);
         f.write_all(byte_slice).expect("2");
         f.rewind().expect("3");
         let fd = f.as_fd();
@@ -149,7 +148,9 @@ fn main() {
         temp_files.push(f);
     }
     conn.flush().expect("4");
-    std::thread::sleep(std::time::Duration::from_secs(10));
+    loop {
+        event_queue.blocking_dispatch(&mut state).unwrap();
+    }
 }
 
 fn fill_gamma_table(table: &mut [u16], ramp_size: u32, rgb: tempergb::Color) {
