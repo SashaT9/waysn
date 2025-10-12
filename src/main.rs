@@ -1,3 +1,6 @@
+mod args;
+use args::Args;
+use clap::Parser;
 use std::collections::HashMap;
 use std::io::{Seek, Write};
 use std::os::fd::AsFd;
@@ -21,11 +24,10 @@ struct AppData {
 }
 impl AppData {
     fn new() -> Self {
-        let app_data = Self {
+        Self {
             outputs: HashMap::new(),
             manager: None,
-        };
-        app_data
+        }
     }
 }
 
@@ -114,6 +116,7 @@ impl Dispatch<zwlr_gamma_control_v1::ZwlrGammaControlV1, u32> for AppData {
 }
 
 fn main() {
+    let Args { action } = Args::parse();
     let conn = Connection::connect_to_env().unwrap();
     let display = conn.display();
     let mut event_queue = conn.new_event_queue();
@@ -121,6 +124,9 @@ fn main() {
     let _registry = display.get_registry(&qh, ());
     let mut state = AppData::new();
     event_queue.roundtrip(&mut state).unwrap();
+    if state.manager.is_none() {
+        println!("YOU ARE NOOB T.T");
+    }
     if let Some(manager) = &state.manager {
         for (idx, output) in state.outputs.iter_mut() {
             let gamma = manager.get_gamma_control(&output.output, &qh, *idx);
@@ -128,15 +134,15 @@ fn main() {
         }
     }
     event_queue.roundtrip(&mut state).unwrap();
-    if state.manager.is_none() {
-        println!("YOU ARE NOOB T.T");
-    }
     let mut temp_files = Vec::new();
     for (_idx, output) in state.outputs.iter_mut() {
-        let kelvin = 4000;
         let size = output.ramp_size as usize;
         let mut table = vec![0u16; size * 3];
-        fill_gamma_table(&mut table, output.ramp_size, rgb_from_temperature(kelvin));
+        fill_gamma_table(
+            &mut table,
+            output.ramp_size,
+            rgb_from_temperature(action.get_kelvin()),
+        );
         let mut f = tempfile::tempfile().expect("1");
         let byte_slice: &[u8] = bytemuck::cast_slice(&table);
         f.write_all(byte_slice).expect("2");
