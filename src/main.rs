@@ -2,12 +2,13 @@ mod args;
 use args::Args;
 use clap::Parser;
 use std::collections::HashMap;
+use std::error::Error;
 use std::io::{Seek, Write};
 use std::os::fd::AsFd;
 use tempergb::rgb_from_temperature;
 use wayland_client::{
-    protocol::{wl_output, wl_registry},
     Connection, Dispatch, Proxy, QueueHandle,
+    protocol::{wl_output, wl_registry},
 };
 use wayland_protocols_wlr::gamma_control::v1::client::{
     zwlr_gamma_control_manager_v1, zwlr_gamma_control_v1,
@@ -115,25 +116,22 @@ impl Dispatch<zwlr_gamma_control_v1::ZwlrGammaControlV1, u32> for AppData {
     }
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let Args { action } = Args::parse();
-    let conn = Connection::connect_to_env().unwrap();
+    let conn = Connection::connect_to_env()?;
     let display = conn.display();
     let mut event_queue = conn.new_event_queue();
     let qh = event_queue.handle();
     let _registry = display.get_registry(&qh, ());
     let mut state = AppData::new();
-    event_queue.roundtrip(&mut state).unwrap();
-    if state.manager.is_none() {
-        println!("YOU ARE NOOB T.T");
-    }
+    event_queue.roundtrip(&mut state)?;
     if let Some(manager) = &state.manager {
         for (idx, output) in state.outputs.iter_mut() {
             let gamma = manager.get_gamma_control(&output.output, &qh, *idx);
             output.gamma = Some(gamma);
         }
     }
-    event_queue.roundtrip(&mut state).unwrap();
+    event_queue.roundtrip(&mut state)?;
     let mut temp_files = Vec::new();
     for (_idx, output) in state.outputs.iter_mut() {
         let size = output.ramp_size as usize;
@@ -143,19 +141,19 @@ fn main() {
             output.ramp_size,
             rgb_from_temperature(action.get_kelvin()),
         );
-        let mut f = tempfile::tempfile().expect("1");
+        let mut f = tempfile::tempfile()?;
         let byte_slice: &[u8] = bytemuck::cast_slice(&table);
-        f.write_all(byte_slice).expect("2");
-        f.rewind().expect("3");
+        f.write_all(byte_slice)?;
+        f.rewind()?;
         let fd = f.as_fd();
         if let Some(gamma) = &output.gamma {
             gamma.set_gamma(fd);
         }
         temp_files.push(f);
     }
-    conn.flush().expect("4");
+    conn.flush()?;
     loop {
-        event_queue.blocking_dispatch(&mut state).unwrap();
+        event_queue.blocking_dispatch(&mut state)?;
     }
 }
 
