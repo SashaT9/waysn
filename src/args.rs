@@ -9,7 +9,11 @@ pub struct Args {
 
 #[derive(Subcommand)]
 pub enum Action {
-    Set { kelvin: u32 },
+    /// Set the temperature in Kelvin (default: 6500)
+    Set {
+        #[arg(default_value_t = 6500)]
+        kelvin: u32,
+    },
 }
 
 impl Action {

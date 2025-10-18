@@ -6,6 +6,7 @@ use std::error::Error;
 use std::io::{Seek, Write};
 use std::os::fd::AsFd;
 use tempergb::rgb_from_temperature;
+use wayland_client::delegate_noop;
 use wayland_client::{
     Connection, Dispatch, Proxy, QueueHandle,
     protocol::{wl_output, wl_registry},
@@ -16,7 +17,7 @@ use wayland_protocols_wlr::gamma_control::v1::client::{
 
 struct OutputInfo {
     output: wl_output::WlOutput,
-    gamma: Option<zwlr_gamma_control_v1::ZwlrGammaControlV1>,
+    gamma_control: Option<zwlr_gamma_control_v1::ZwlrGammaControlV1>,
     ramp_size: u32,
 }
 struct AppData {
@@ -47,14 +48,13 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
             version,
         } = event
         {
-            // println!("[{}] {} (v{})", name, interface, version);
             if interface == wl_output::WlOutput::interface().name {
                 let output = registry.bind::<wl_output::WlOutput, _, _>(name, version, qh, name);
                 state.outputs.insert(
                     name,
                     OutputInfo {
                         output: output,
-                        gamma: None,
+                        gamma_control: None,
                         ramp_size: 0,
                     },
                 );
@@ -86,22 +86,12 @@ impl Dispatch<wl_output::WlOutput, u32> for AppData {
     }
 }
 
-// actually not used. Written so that bind does not complain
-impl Dispatch<zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1, ()> for AppData {
-    fn event(
-        _: &mut Self,
-        _: &zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1,
-        _: zwlr_gamma_control_manager_v1::Event,
-        _: &(),
-        _: &Connection,
-        _: &QueueHandle<Self>,
-    ) {
-    }
-}
+delegate_noop!(AppData: ignore zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1);
+
 impl Dispatch<zwlr_gamma_control_v1::ZwlrGammaControlV1, u32> for AppData {
     fn event(
         state: &mut Self,
-        gamma_controller: &zwlr_gamma_control_v1::ZwlrGammaControlV1,
+        gamma_control: &zwlr_gamma_control_v1::ZwlrGammaControlV1,
         event: zwlr_gamma_control_v1::Event,
         idx: &u32,
         _: &Connection,
@@ -111,12 +101,11 @@ impl Dispatch<zwlr_gamma_control_v1::ZwlrGammaControlV1, u32> for AppData {
             zwlr_gamma_control_v1::Event::GammaSize { size } => {
                 if let Some(output_info) = state.outputs.get_mut(idx) {
                     output_info.ramp_size = size;
-                    println!("{}", size);
                 }
             }
             zwlr_gamma_control_v1::Event::Failed => {
-                // println!("I DESTROY");
-                gamma_controller.destroy();
+                eprintln!("gamma control is no longer valid");
+                gamma_control.destroy();
             }
             _ => {}
         }
@@ -134,8 +123,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     event_queue.roundtrip(&mut state)?;
     if let Some(manager) = &state.manager {
         for (idx, output) in state.outputs.iter_mut() {
-            let gamma = manager.get_gamma_control(&output.output, &qh, *idx);
-            output.gamma = Some(gamma);
+            let gamma_control = manager.get_gamma_control(&output.output, &qh, *idx);
+            output.gamma_control = Some(gamma_control);
         }
     }
     event_queue.roundtrip(&mut state)?;
@@ -153,8 +142,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         f.write_all(byte_slice)?;
         f.rewind()?;
         let fd = f.as_fd();
-        if let Some(gamma) = &output.gamma {
-            gamma.set_gamma(fd);
+        if let Some(gamma_control) = &output.gamma_control {
+            gamma_control.set_gamma(fd);
         }
         temp_files.push(f);
     }
