@@ -101,17 +101,24 @@ impl Dispatch<zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1, ()> for 
 impl Dispatch<zwlr_gamma_control_v1::ZwlrGammaControlV1, u32> for AppData {
     fn event(
         state: &mut Self,
-        _: &zwlr_gamma_control_v1::ZwlrGammaControlV1,
+        gamma_controller: &zwlr_gamma_control_v1::ZwlrGammaControlV1,
         event: zwlr_gamma_control_v1::Event,
         idx: &u32,
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        if let zwlr_gamma_control_v1::Event::GammaSize { size } = event {
-            if let Some(output_info) = state.outputs.get_mut(idx) {
-                output_info.ramp_size = size;
-                println!("{}", size);
+        match event {
+            zwlr_gamma_control_v1::Event::GammaSize { size } => {
+                if let Some(output_info) = state.outputs.get_mut(idx) {
+                    output_info.ramp_size = size;
+                    println!("{}", size);
+                }
             }
+            zwlr_gamma_control_v1::Event::Failed => {
+                // println!("I DESTROY");
+                gamma_controller.destroy();
+            }
+            _ => {}
         }
     }
 }
