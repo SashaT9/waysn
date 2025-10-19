@@ -5,20 +5,20 @@ use std::os::fd::AsFd;
 use tempergb::rgb_from_temperature;
 use wayland_client::delegate_noop;
 use wayland_client::{
-    Connection, Dispatch, Proxy, QueueHandle,
     protocol::{wl_output, wl_registry},
+    Connection, Dispatch, Proxy, QueueHandle,
 };
 use wayland_protocols_wlr::gamma_control::v1::client::{
     zwlr_gamma_control_manager_v1, zwlr_gamma_control_v1,
 };
 pub struct OutputInfo {
-    pub output: wl_output::WlOutput,
-    pub gamma_control: Option<zwlr_gamma_control_v1::ZwlrGammaControlV1>,
-    pub ramp_size: u32,
+    output: wl_output::WlOutput,
+    gamma_control: Option<zwlr_gamma_control_v1::ZwlrGammaControlV1>,
+    ramp_size: u32,
 }
 pub struct AppData {
-    pub outputs: HashMap<u32, OutputInfo>,
-    pub manager: Option<zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1>,
+    outputs: HashMap<u32, OutputInfo>,
+    manager: Option<zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1>,
 }
 
 impl AppData {
