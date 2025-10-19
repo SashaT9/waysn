@@ -1,4 +1,8 @@
 use std::collections::HashMap;
+use std::error::Error;
+use std::io::{Seek, Write};
+use std::os::fd::AsFd;
+use tempergb::rgb_from_temperature;
 use wayland_client::delegate_noop;
 use wayland_client::{
     Connection, Dispatch, Proxy, QueueHandle,
@@ -23,6 +27,30 @@ impl AppData {
             outputs: HashMap::new(),
             manager: None,
         }
+    }
+    pub fn assign_gamma_control_all(&mut self, qh: &QueueHandle<Self>) {
+        if let Some(manager) = &self.manager {
+            for (idx, output_info) in self.outputs.iter_mut() {
+                let gamma_control = manager.get_gamma_control(&output_info.output, &qh, *idx);
+                output_info.gamma_control = Some(gamma_control);
+            }
+        }
+    }
+    pub fn apply_gamma_control_all(&mut self, kelvin: u32) -> Result<(), Box<dyn Error>> {
+        for (_, output) in self.outputs.iter_mut() {
+            let size = output.ramp_size as usize;
+            let mut table = vec![0u16; size * 3];
+            fill_gamma_table(&mut table, output.ramp_size, rgb_from_temperature(kelvin));
+            let mut f = tempfile::tempfile()?;
+            let byte_slice: &[u8] = bytemuck::cast_slice(&table);
+            f.write_all(byte_slice)?;
+            f.rewind()?;
+            let fd = f.as_fd();
+            if let Some(gamma_control) = &output.gamma_control {
+                gamma_control.set_gamma(fd);
+            }
+        }
+        Ok(())
     }
 }
 
