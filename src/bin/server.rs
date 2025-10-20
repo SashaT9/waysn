@@ -24,10 +24,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     loop {
         let (mut stream, _) = listener.accept().await?;
         tokio::spawn(async move {
-            let mut buf = Vec::new();
-            if stream.read_to_end(&mut buf).await.is_ok() {
-                if let Ok(cmd) = bincode::decode_from_slice::<IpcCommand, _>(&buf, standard()) {
-                    println!("{:?}", cmd);
+            let length = stream.read_u32().await;
+            if let Ok(length) = length {
+                println!("{}", length);
+                let mut buf = vec![0u8; length as usize];
+                if stream.read_exact(&mut buf).await.is_ok() {
+                    if let Ok(cmd) = bincode::decode_from_slice::<IpcCommand, _>(&buf, standard()) {
+                        println!("{:?}", cmd);
+                    }
                 }
             }
         });
