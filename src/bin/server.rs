@@ -1,13 +1,10 @@
-use args::Args;
 use bincode;
 use bincode::config::standard;
-use clap::Parser;
 use std::error::Error;
 use std::path::PathBuf;
 use tokio::io::AsyncReadExt;
 use tokio::net::UnixListener;
 use wayland_client::Connection;
-use waysn::args;
 use waysn::ipc::IpcCommand;
 use waysn::wayland;
 
@@ -21,24 +18,31 @@ async fn main() -> Result<(), Box<dyn Error>> {
         std::fs::remove_file(&socket_path)?;
     }
     let listener = UnixListener::bind(socket_path)?;
-    loop {
-        let (mut stream, _) = listener.accept().await?;
-        tokio::spawn(async move {
-            let length = stream.read_u32().await;
-            if let Ok(length) = length {
-                println!("{}", length);
-                let mut buf = vec![0u8; length as usize];
-                if stream.read_exact(&mut buf).await.is_ok() {
-                    if let Ok(cmd) = bincode::decode_from_slice::<IpcCommand, _>(&buf, standard()) {
-                        println!("{:?}", cmd);
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    tokio::spawn(async move {
+        loop {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let tx = tx.clone();
+            tokio::spawn(async move {
+                let length = stream.read_u32().await;
+                if let Ok(length) = length {
+                    println!("{}", length);
+                    let mut buf = vec![0u8; length as usize];
+                    if stream.read_exact(&mut buf).await.is_ok() {
+                        if let Ok(cmd) =
+                            bincode::decode_from_slice::<IpcCommand, _>(&buf, standard())
+                        {
+                            println!("{:?}", cmd);
+                            if let Err(e) = tx.send(cmd) {
+                                eprintln!("{}", e);
+                            }
+                        }
                     }
                 }
-            }
-        });
-    }
+            });
+        }
+    });
 
-    /*
-    let Args { action } = Args::parse();
     let conn = Connection::connect_to_env()?;
     let display = conn.display();
     let mut event_queue = conn.new_event_queue();
@@ -48,10 +52,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     event_queue.roundtrip(&mut state)?;
     state.assign_gamma_control_all(&qh);
     event_queue.roundtrip(&mut state)?;
-    state.apply_gamma_control_all(action.get_kelvin())?;
-    conn.flush()?;
+
     loop {
-        event_queue.blocking_dispatch(&mut state)?;
+        tokio::select! {
+            Some((cmd, _)) = rx.recv() => {
+                if let IpcCommand::SetTemperature { kelvin } = cmd {
+                    state.apply_gamma_control_all(kelvin)?;
+                }
+                conn.flush()?;
+                event_queue.roundtrip(&mut state)?;
+            }
+        }
     }
-    */
 }

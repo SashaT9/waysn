@@ -1,18 +1,20 @@
 use std::{error::Error, path::PathBuf};
 
 use bincode::config::standard;
+use clap::Parser;
 use tokio::{io::AsyncWriteExt, net::UnixStream};
-use waysn::ipc::IpcCommand;
+use waysn::{args::Args, ipc::IpcCommand};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let Args { action } = Args::parse();
     let xdg_runtime_path = std::env::var("XDG_RUNTIME_DIR")?;
     let wayland_display = std::env::var("WAYLAND_DISPLAY")?;
     let mut socket_path = PathBuf::from(xdg_runtime_path);
     socket_path.push(format!("{}-waysn.sock", wayland_display));
 
     let stream = UnixStream::connect(socket_path).await?;
-    let _ = send_message(IpcCommand::SetTemperature { kelvin: 4000 }, stream).await?;
+    let _ = send_message(IpcCommand::SetTemperature { kelvin: action.get_kelvin() }, stream).await?;
     Ok(())
 }
 
