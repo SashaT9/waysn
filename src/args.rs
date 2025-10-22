@@ -14,12 +14,15 @@ pub enum Action {
         #[arg(default_value_t = 6500)]
         kelvin: u32,
     },
+    /// Kills the daemon
+    Kill {},
 }
 
 impl Action {
     pub fn get_kelvin(&self) -> u32 {
         match self {
             Self::Set { kelvin: provided } => *provided,
+            _ => 0,
         }
     }
 }

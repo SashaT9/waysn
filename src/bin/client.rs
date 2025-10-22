@@ -14,7 +14,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     socket_path.push(format!("{}-waysn.sock", wayland_display));
 
     let stream = UnixStream::connect(socket_path).await?;
-    let _ = send_message(IpcCommand::SetTemperature { kelvin: action.get_kelvin() }, stream).await?;
+    match action {
+        waysn::args::Action::Set { kelvin } => {
+            let _ = send_message(IpcCommand::SetTemperature { kelvin: kelvin }, stream).await?;
+        }
+        waysn::args::Action::Kill {} => {
+            let _ = send_message(IpcCommand::Kill {}, stream).await?;
+        }
+    }
     Ok(())
 }
 

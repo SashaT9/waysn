@@ -20,29 +20,34 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
         std::fs::remove_file(&socket_path)?;
     }
+    let socket_path_clone = socket_path.clone();
     let listener = UnixListener::bind(socket_path)?;
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
     tokio::spawn(async move {
         loop {
-            let (mut stream, _) = listener.accept().await.unwrap();
-            let tx = tx.clone();
-            tokio::spawn(async move {
-                let length = stream.read_u32().await;
-                if let Ok(length) = length {
-                    println!("{}", length);
-                    let mut buf = vec![0u8; length as usize];
-                    if stream.read_exact(&mut buf).await.is_ok() {
-                        if let Ok(cmd) =
-                            bincode::decode_from_slice::<IpcCommand, _>(&buf, standard())
-                        {
-                            println!("{:?}", cmd);
-                            if let Err(e) = tx.send(cmd) {
-                                eprintln!("{}", e);
+            match listener.accept().await {
+                Ok((mut stream, _)) => {
+                    let tx = tx.clone();
+                    tokio::spawn(async move {
+                        let length = stream.read_u32().await;
+                        if let Ok(length) = length {
+                            println!("{}", length);
+                            let mut buf = vec![0u8; length as usize];
+                            if stream.read_exact(&mut buf).await.is_ok() {
+                                if let Ok(cmd) =
+                                    bincode::decode_from_slice::<IpcCommand, _>(&buf, standard())
+                                {
+                                    println!("{:?}", cmd);
+                                    if let Err(e) = tx.send(cmd) {
+                                        eprintln!("{}", e);
+                                    }
+                                }
                             }
                         }
-                    }
+                    });
                 }
-            });
+                Err(_) => {}
+            }
         }
     });
 
@@ -59,12 +64,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
     loop {
         tokio::select! {
             Some((cmd, _)) = rx.recv() => {
-                if let IpcCommand::SetTemperature { kelvin } = cmd {
-                    state.apply_gamma_control_all(kelvin)?;
+                match cmd {
+                    IpcCommand::SetTemperature { kelvin } => {
+                        state.apply_gamma_control_all(kelvin)?;
+                    },
+                    IpcCommand::Kill {} => {
+                        break;
+                    }
                 }
-                conn.flush()?;
                 event_queue.roundtrip(&mut state)?;
+            },
+            _ = tokio::signal::ctrl_c() => {
+                break;
             }
         }
     }
+    std::fs::remove_file(&socket_path_clone)?;
+    Ok(())
 }
