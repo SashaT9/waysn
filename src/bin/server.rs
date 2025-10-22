@@ -3,7 +3,7 @@ use bincode::config::standard;
 use std::error::Error;
 use std::path::PathBuf;
 use tokio::io::AsyncReadExt;
-use tokio::net::UnixListener;
+use tokio::net::{UnixListener, UnixStream};
 use wayland_client::Connection;
 use waysn::ipc::IpcCommand;
 use waysn::wayland;
@@ -15,6 +15,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut socket_path = PathBuf::from(xdg_runtime_path);
     socket_path.push(format!("{}-waysn.sock", wayland_display));
     if std::fs::metadata(&socket_path).is_ok() {
+        if UnixStream::connect(&socket_path).await.is_ok() {
+            return Err("server is already running".into());
+        }
         std::fs::remove_file(&socket_path)?;
     }
     let listener = UnixListener::bind(socket_path)?;
