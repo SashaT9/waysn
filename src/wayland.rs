@@ -5,8 +5,8 @@ use std::os::fd::AsFd;
 use tempergb::rgb_from_temperature;
 use wayland_client::delegate_noop;
 use wayland_client::{
-    Connection, Dispatch, Proxy, QueueHandle,
     protocol::{wl_output, wl_registry},
+    Connection, Dispatch, Proxy, QueueHandle,
 };
 use wayland_protocols_wlr::gamma_control::v1::client::{
     zwlr_gamma_control_manager_v1, zwlr_gamma_control_v1,
@@ -26,6 +26,14 @@ impl AppData {
         Self {
             outputs: HashMap::new(),
             manager: None,
+        }
+    }
+    pub fn assign_gamma_control_one(&mut self, qh: &QueueHandle<Self>, name: u32) {
+        if let Some(manager) = &self.manager {
+            if let Some(output_info) = self.outputs.get_mut(&name) {
+                let gamma_control = manager.get_gamma_control(&output_info.output, &qh, name);
+                output_info.gamma_control = Some(gamma_control);
+            }
         }
     }
     pub fn assign_gamma_control_all(&mut self, qh: &QueueHandle<Self>) {
@@ -79,6 +87,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
                         ramp_size: 0,
                     },
                 );
+                state.assign_gamma_control_one(qh, name);
             }
             if interface
                 == zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1::interface().name
@@ -91,6 +100,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
                         (),
                     );
                 state.manager = Some(manager);
+                state.assign_gamma_control_all(qh);
             }
         }
     }

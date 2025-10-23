@@ -58,7 +58,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let _registry = display.get_registry(&qh, ());
     let mut state = wayland::AppData::new();
     event_queue.roundtrip(&mut state)?;
-    state.assign_gamma_control_all(&qh);
     event_queue.roundtrip(&mut state)?;
 
     loop {
