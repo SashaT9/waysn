@@ -14,6 +14,8 @@ pub enum Action {
         #[arg(default_value_t = 6500)]
         kelvin: u32,
     },
+    /// Get the temperature in Kelvin
+    Get {},
     /// Kills the daemon
     Kill {},
 }

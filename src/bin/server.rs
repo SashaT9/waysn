@@ -67,6 +67,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     IpcCommand::SetTemperature { kelvin } => {
                         state.apply_gamma_control_all(kelvin)?;
                     },
+                    IpcCommand::GetTemperature {} => {
+                        todo!()
+                    },
                     IpcCommand::Kill {} => {
                         break;
                     }

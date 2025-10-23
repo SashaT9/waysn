@@ -13,8 +13,10 @@ use wayland_protocols_wlr::gamma_control::v1::client::{
 };
 pub struct OutputInfo {
     output: wl_output::WlOutput,
+    output_name: String,
     gamma_control: Option<zwlr_gamma_control_v1::ZwlrGammaControlV1>,
     ramp_size: u32,
+    current_temperature: u32,
 }
 pub struct AppData {
     outputs: HashMap<u32, OutputInfo>,
@@ -31,6 +33,9 @@ impl AppData {
     pub fn assign_gamma_control_one(&mut self, qh: &QueueHandle<Self>, name: u32) {
         if let Some(manager) = &self.manager {
             if let Some(output_info) = self.outputs.get_mut(&name) {
+                if output_info.gamma_control.is_some() {
+                    return;
+                }
                 let gamma_control = manager.get_gamma_control(&output_info.output, &qh, name);
                 output_info.gamma_control = Some(gamma_control);
             }
@@ -38,8 +43,11 @@ impl AppData {
     }
     pub fn assign_gamma_control_all(&mut self, qh: &QueueHandle<Self>) {
         if let Some(manager) = &self.manager {
-            for (idx, output_info) in self.outputs.iter_mut() {
-                let gamma_control = manager.get_gamma_control(&output_info.output, &qh, *idx);
+            for (name, output_info) in self.outputs.iter_mut() {
+                if output_info.gamma_control.is_some() {
+                    continue;
+                }
+                let gamma_control = manager.get_gamma_control(&output_info.output, &qh, *name);
                 output_info.gamma_control = Some(gamma_control);
             }
         }
@@ -56,6 +64,7 @@ impl AppData {
             let fd = f.as_fd();
             if let Some(gamma_control) = &output.gamma_control {
                 gamma_control.set_gamma(fd);
+                output.current_temperature = kelvin;
             }
         }
         Ok(())
@@ -83,8 +92,10 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
                     name,
                     OutputInfo {
                         output: output,
+                        output_name: String::new(),
                         gamma_control: None,
                         ramp_size: 0,
+                        current_temperature: 0,
                     },
                 );
                 state.assign_gamma_control_one(qh, name);
@@ -107,13 +118,22 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
 }
 impl Dispatch<wl_output::WlOutput, u32> for AppData {
     fn event(
-        _state: &mut Self,
+        state: &mut Self,
         _proxy: &wl_output::WlOutput,
-        _event: wl_output::Event,
-        _idx: &u32,
+        event: wl_output::Event,
+        idx: &u32,
         _conn: &Connection,
         _: &QueueHandle<Self>,
     ) {
+        match event {
+            wl_output::Event::Name { name } => {
+                if let Some(output_info) = state.outputs.get_mut(idx) {
+                    output_info.output_name = name;
+                    println!("{}", output_info.output_name);
+                }
+            }
+            _ => {}
+        }
     }
 }
 

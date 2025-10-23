@@ -18,6 +18,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         waysn::args::Action::Set { kelvin } => {
             let _ = send_message(IpcCommand::SetTemperature { kelvin: kelvin }, stream).await?;
         }
+        waysn::args::Action::Get {  } => {
+            let _ = send_message(IpcCommand::GetTemperature {}, stream).await?;
+        }
         waysn::args::Action::Kill {} => {
             let _ = send_message(IpcCommand::Kill {}, stream).await?;
         }
