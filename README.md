@@ -2,7 +2,7 @@
 Waysn is a command-line tool for adjusting screen gamma on Wayland compositors that support the `wlr-gamma-control-unstable-v1` protocol. It allows you to set the color temperature of your screen.
 
 ## Dependencies
-* A Wayland compositor that supports the `wlr-gamma-control-unstable-v1` protocol (e.g., Sway, Hyprland).
+* A Wayland compositor that supports the `wlr-gamma-control-unstable-v1` protocol (e.g., Sway, niri, Hyprland).
 * Rust and Cargo for building from source.
 
 ## Building from Source
