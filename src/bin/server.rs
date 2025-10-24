@@ -2,10 +2,10 @@ use bincode;
 use bincode::config::standard;
 use std::error::Error;
 use std::path::PathBuf;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{UnixListener, UnixStream};
 use wayland_client::Connection;
-use waysn::ipc::IpcCommand;
+use waysn::ipc::{IpcCommand, IpcResponse};
 use waysn::wayland;
 
 #[tokio::main]
@@ -22,24 +22,37 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
     let socket_path_clone = socket_path.clone();
     let listener = UnixListener::bind(socket_path)?;
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let (wayland_tx, mut wayland_rx) = tokio::sync::mpsc::unbounded_channel();
     tokio::spawn(async move {
         loop {
             match listener.accept().await {
                 Ok((mut stream, _)) => {
-                    let tx = tx.clone();
+                    let wayland_tx = wayland_tx.clone();
                     tokio::spawn(async move {
                         let length = stream.read_u32().await;
                         if let Ok(length) = length {
                             println!("{}", length);
                             let mut buf = vec![0u8; length as usize];
                             if stream.read_exact(&mut buf).await.is_ok() {
-                                if let Ok(cmd) =
+                                if let Ok((cmd, _)) =
                                     bincode::decode_from_slice::<IpcCommand, _>(&buf, standard())
                                 {
+                                    let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
                                     println!("{:?}", cmd);
-                                    if let Err(e) = tx.send(cmd) {
+                                    if let Err(e) = wayland_tx.send((cmd, resp_tx)) {
                                         eprintln!("{}", e);
+                                    }
+                                    match resp_rx.await {
+                                        Ok(response) => {
+                                            if let Ok(data) =
+                                                bincode::encode_to_vec(response, standard())
+                                            {
+                                                let len = data.len();
+                                                stream.write_u32(len as u32).await.unwrap();
+                                                stream.write_all(&data).await.unwrap();
+                                            }
+                                        }
+                                        _ => {}
                                     }
                                 }
                             }
@@ -62,13 +75,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         tokio::select! {
-            Some((cmd, _)) = rx.recv() => {
+            Some((cmd, resp)) = wayland_rx.recv() => {
                 match cmd {
                     IpcCommand::SetTemperature { kelvin } => {
                         state.apply_gamma_control_all(kelvin)?;
                     },
                     IpcCommand::GetTemperature {} => {
-                        todo!()
+                        let response = IpcResponse::Temperature { kelvin: 3000 };
+                        let _ = resp.send(response);
                     },
                     IpcCommand::Kill {} => {
                         break;

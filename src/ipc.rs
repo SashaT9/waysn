@@ -6,3 +6,8 @@ pub enum IpcCommand {
     GetTemperature {},
     Kill {},
 }
+
+#[derive(Encode, Decode, Debug)]
+pub enum IpcResponse {
+    Temperature { kelvin: u32 },
+}
