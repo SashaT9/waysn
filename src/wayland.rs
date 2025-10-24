@@ -5,8 +5,8 @@ use std::os::fd::AsFd;
 use tempergb::rgb_from_temperature;
 use wayland_client::delegate_noop;
 use wayland_client::{
-    Connection, Dispatch, Proxy, QueueHandle,
     protocol::{wl_output, wl_registry},
+    Connection, Dispatch, Proxy, QueueHandle,
 };
 use wayland_protocols_wlr::gamma_control::v1::client::{
     zwlr_gamma_control_manager_v1, zwlr_gamma_control_v1,
@@ -133,39 +133,49 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
         _: &Connection,
         qh: &QueueHandle<Self>,
     ) {
-        if let wl_registry::Event::Global {
-            name,
-            interface,
-            version,
-        } = event
-        {
-            if interface == wl_output::WlOutput::interface().name {
-                let output = registry.bind::<wl_output::WlOutput, _, _>(name, version, qh, name);
-                state.outputs.insert(
-                    name,
-                    OutputInfo {
-                        output: output,
-                        output_name: String::new(),
-                        gamma_control: None,
-                        ramp_size: 0,
-                        current_temperature: 6500,
-                    },
-                );
-                state.assign_gamma_control_one(qh, name);
-            }
-            if interface
-                == zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1::interface().name
-            {
-                let manager = registry
-                    .bind::<zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1, _, _>(
+        match event {
+            wl_registry::Event::Global {
+                name,
+                interface,
+                version,
+            } => {
+                if interface == wl_output::WlOutput::interface().name {
+                    let output =
+                        registry.bind::<wl_output::WlOutput, _, _>(name, version, qh, name);
+                    state.outputs.insert(
                         name,
-                        version,
-                        qh,
-                        (),
+                        OutputInfo {
+                            output: output,
+                            output_name: String::new(),
+                            gamma_control: None,
+                            ramp_size: 0,
+                            current_temperature: 6500,
+                        },
                     );
-                state.manager = Some(manager);
-                state.assign_gamma_control_all(qh);
+                    state.assign_gamma_control_one(qh, name);
+                }
+                if interface
+                    == zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1::interface().name
+                {
+                    let manager = registry
+                        .bind::<zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1, _, _>(
+                            name,
+                            version,
+                            qh,
+                            (),
+                        );
+                    state.manager = Some(manager);
+                    state.assign_gamma_control_all(qh);
+                }
             }
+            wl_registry::Event::GlobalRemove { name } => {
+                if let Some(output_info) = state.outputs.remove(&name) {
+                    if let Some(gamma_control) = output_info.gamma_control {
+                        gamma_control.destroy();
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }
