@@ -1,10 +1,13 @@
 use bincode;
 use bincode::config::standard;
 use std::error::Error;
+use std::os::fd::AsFd;
 use std::path::PathBuf;
+use tokio::io::unix::AsyncFd;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{UnixListener, UnixStream};
 use wayland_client::Connection;
+use wayland_client::backend::WaylandError;
 use waysn::ipc::{IpcCommand, IpcResponse};
 use waysn::wayland;
 
@@ -41,6 +44,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let conn = Connection::connect_to_env()?;
     let display = conn.display();
+    let wayland_fd = AsyncFd::new(conn.as_fd())?;
     let mut event_queue = conn.new_event_queue();
     let qh = event_queue.handle();
     let _registry = display.get_registry(&qh, ());
@@ -63,7 +67,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         break;
                     }
                 }
-                event_queue.roundtrip(&mut state)?;
+                event_queue.flush()?;
+            },
+            Ok(mut guard) = wayland_fd.readable() => {
+                if let Some(read_guard) = event_queue.prepare_read() {
+                    match read_guard.read() {
+                        Ok(_) => {
+                            event_queue.dispatch_pending(&mut state)?;
+                        }
+                        Err(WaylandError::Io(e)) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                            // not fatal. https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.WouldBlock
+                        }
+                        Err(e) => return Err(e.into())
+                    }
+                } else {
+                    event_queue.dispatch_pending(&mut state)?;
+                }
+                guard.clear_ready();
             },
             _ = tokio::signal::ctrl_c() => {
                 break;
