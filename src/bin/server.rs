@@ -26,36 +26,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     tokio::spawn(async move {
         loop {
             match listener.accept().await {
-                Ok((mut stream, _)) => {
+                Ok((stream, _)) => {
                     let wayland_tx = wayland_tx.clone();
                     tokio::spawn(async move {
-                        let length = stream.read_u32().await;
-                        if let Ok(length) = length {
-                            println!("{}", length);
-                            let mut buf = vec![0u8; length as usize];
-                            if stream.read_exact(&mut buf).await.is_ok() {
-                                if let Ok((cmd, _)) =
-                                    bincode::decode_from_slice::<IpcCommand, _>(&buf, standard())
-                                {
-                                    let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
-                                    println!("{:?}", cmd);
-                                    if let Err(e) = wayland_tx.send((cmd, resp_tx)) {
-                                        eprintln!("{}", e);
-                                    }
-                                    match resp_rx.await {
-                                        Ok(response) => {
-                                            if let Ok(data) =
-                                                bincode::encode_to_vec(response, standard())
-                                            {
-                                                let len = data.len();
-                                                stream.write_u32(len as u32).await.unwrap();
-                                                stream.write_all(&data).await.unwrap();
-                                            }
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                            }
+                        if let Err(e) = handle_connection(stream, wayland_tx).await {
+                            eprintln!("{}", e);
                         }
                     });
                 }
@@ -96,5 +71,28 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     std::fs::remove_file(&socket_path_clone)?;
+    Ok(())
+}
+
+async fn handle_connection(
+    mut stream: UnixStream,
+    wayland_tx: tokio::sync::mpsc::UnboundedSender<(
+        IpcCommand,
+        tokio::sync::oneshot::Sender<IpcResponse>,
+    )>,
+) -> Result<(), Box<dyn Error>> {
+    let length = stream.read_u32().await?;
+    println!("{}", length);
+    let mut buf = vec![0u8; length as usize];
+    stream.read_exact(&mut buf).await?;
+    let (cmd, _) = bincode::decode_from_slice::<IpcCommand, _>(&buf, standard())?;
+    let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
+    println!("{:?}", cmd);
+    wayland_tx.send((cmd, resp_tx))?;
+    let response = resp_rx.await?;
+    let data = bincode::encode_to_vec(response, standard())?;
+    let len = data.len();
+    stream.write_u32(len as u32).await?;
+    stream.write_all(&data).await?;
     Ok(())
 }

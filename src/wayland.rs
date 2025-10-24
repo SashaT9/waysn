@@ -5,8 +5,8 @@ use std::os::fd::AsFd;
 use tempergb::rgb_from_temperature;
 use wayland_client::delegate_noop;
 use wayland_client::{
-    protocol::{wl_output, wl_registry},
     Connection, Dispatch, Proxy, QueueHandle,
+    protocol::{wl_output, wl_registry},
 };
 use wayland_protocols_wlr::gamma_control::v1::client::{
     zwlr_gamma_control_manager_v1, zwlr_gamma_control_v1,
