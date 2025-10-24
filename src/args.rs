@@ -10,10 +10,12 @@ pub struct Args {
 #[derive(Subcommand)]
 pub enum Action {
     /// Set the temperature in Kelvin (default: 6500)
+    #[command(override_usage = "[KELVIN] [OPTIONS]")]
     Set {
         #[arg(default_value_t = 6500)]
         kelvin: u32,
         /// The names of the outputs (e.g eDP-1)
+        #[arg(short, long, num_args(1..))]
         outputs: Vec<String>,
     },
     /// Get the temperature in Kelvin
