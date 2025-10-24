@@ -69,6 +69,27 @@ impl AppData {
         }
         Ok(())
     }
+    pub fn get_temperatures(&mut self, names: Vec<String>) -> Vec<(String, u32)> {
+        let mut result = Vec::new();
+        if names.is_empty() {
+            for (_, output_info) in self.outputs.iter() {
+                result.push((
+                    output_info.output_name.clone(),
+                    output_info.current_temperature,
+                ));
+            }
+        } else {
+            for (_, output_info) in self.outputs.iter() {
+                if names.contains(&output_info.output_name) {
+                    result.push((
+                        output_info.output_name.clone(),
+                        output_info.current_temperature,
+                    ));
+                }
+            }
+        }
+        result
+    }
 }
 
 impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
@@ -95,7 +116,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
                         output_name: String::new(),
                         gamma_control: None,
                         ramp_size: 0,
-                        current_temperature: 0,
+                        current_temperature: 6500,
                     },
                 );
                 state.assign_gamma_control_one(qh, name);

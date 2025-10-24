@@ -15,7 +15,10 @@ pub enum Action {
         kelvin: u32,
     },
     /// Get the temperature in Kelvin
-    Get {},
+    Get {
+        /// The names of the outputs
+        outputs: Vec<String>,
+    },
     /// Kills the daemon
     Kill {},
 }

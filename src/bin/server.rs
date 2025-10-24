@@ -80,8 +80,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     IpcCommand::SetTemperature { kelvin } => {
                         state.apply_gamma_control_all(kelvin)?;
                     },
-                    IpcCommand::GetTemperature {} => {
-                        let response = IpcResponse::Temperature { kelvin: 3000 };
+                    IpcCommand::GetTemperature { outputs } => {
+                        let response = IpcResponse::Temperature { temperatures: state.get_temperatures(outputs) };
                         let _ = resp.send(response);
                     },
                     IpcCommand::Kill {} => {

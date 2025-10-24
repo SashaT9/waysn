@@ -25,8 +25,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let _ =
                 send_message(IpcCommand::SetTemperature { kelvin: kelvin }, &mut stream).await?;
         }
-        waysn::args::Action::Get {} => {
-            let _ = send_message(IpcCommand::GetTemperature {}, &mut stream).await?;
+        waysn::args::Action::Get { outputs } => {
+            let _ =
+                send_message(IpcCommand::GetTemperature { outputs: outputs }, &mut stream).await?;
             let length = stream.read_u32().await;
             if let Ok(length) = length {
                 let mut buf = vec![0u8; length as usize];
