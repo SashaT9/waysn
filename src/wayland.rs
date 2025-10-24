@@ -52,19 +52,51 @@ impl AppData {
             }
         }
     }
-    pub fn apply_gamma_control_all(&mut self, kelvin: u32) -> Result<(), Box<dyn Error>> {
-        for (_, output) in self.outputs.iter_mut() {
-            let size = output.ramp_size as usize;
-            let mut table = vec![0u16; size * 3];
-            fill_gamma_table(&mut table, output.ramp_size, rgb_from_temperature(kelvin));
-            let mut f = tempfile::tempfile()?;
-            let byte_slice: &[u8] = bytemuck::cast_slice(&table);
-            f.write_all(byte_slice)?;
-            f.rewind()?;
-            let fd = f.as_fd();
-            if let Some(gamma_control) = &output.gamma_control {
-                gamma_control.set_gamma(fd);
-                output.current_temperature = kelvin;
+    pub fn apply_gamma_control(
+        &mut self,
+        names: Vec<String>,
+        kelvin: u32,
+    ) -> Result<(), Box<dyn Error>> {
+        if names.is_empty() {
+            for (_, output_info) in self.outputs.iter_mut() {
+                let size = output_info.ramp_size as usize;
+                let mut table = vec![0u16; size * 3];
+                fill_gamma_table(
+                    &mut table,
+                    output_info.ramp_size,
+                    rgb_from_temperature(kelvin),
+                );
+                let mut f = tempfile::tempfile()?;
+                let byte_slice: &[u8] = bytemuck::cast_slice(&table);
+                f.write_all(byte_slice)?;
+                f.rewind()?;
+                let fd = f.as_fd();
+                if let Some(gamma_control) = &output_info.gamma_control {
+                    gamma_control.set_gamma(fd);
+                    output_info.current_temperature = kelvin;
+                }
+            }
+        } else {
+            for (_, output_info) in self.outputs.iter_mut() {
+                if !names.contains(&output_info.output_name) {
+                    continue;
+                }
+                let size = output_info.ramp_size as usize;
+                let mut table = vec![0u16; size * 3];
+                fill_gamma_table(
+                    &mut table,
+                    output_info.ramp_size,
+                    rgb_from_temperature(kelvin),
+                );
+                let mut f = tempfile::tempfile()?;
+                let byte_slice: &[u8] = bytemuck::cast_slice(&table);
+                f.write_all(byte_slice)?;
+                f.rewind()?;
+                let fd = f.as_fd();
+                if let Some(gamma_control) = &output_info.gamma_control {
+                    gamma_control.set_gamma(fd);
+                    output_info.current_temperature = kelvin;
+                }
             }
         }
         Ok(())

@@ -77,8 +77,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         tokio::select! {
             Some((cmd, resp)) = wayland_rx.recv() => {
                 match cmd {
-                    IpcCommand::SetTemperature { kelvin } => {
-                        state.apply_gamma_control_all(kelvin)?;
+                    IpcCommand::SetTemperature { kelvin, outputs } => {
+                        state.apply_gamma_control(outputs, kelvin)?;
                     },
                     IpcCommand::GetTemperature { outputs } => {
                         let response = IpcResponse::Temperature { temperatures: state.get_temperatures(outputs) };

@@ -13,10 +13,12 @@ pub enum Action {
     Set {
         #[arg(default_value_t = 6500)]
         kelvin: u32,
+        /// The names of the outputs (e.g eDP-1)
+        outputs: Vec<String>,
     },
     /// Get the temperature in Kelvin
     Get {
-        /// The names of the outputs
+        /// The names of the outputs (e.g eDP-1)
         outputs: Vec<String>,
     },
     /// Kills the daemon
@@ -26,7 +28,10 @@ pub enum Action {
 impl Action {
     pub fn get_kelvin(&self) -> u32 {
         match self {
-            Self::Set { kelvin: provided } => *provided,
+            Self::Set {
+                kelvin: provided,
+                outputs: _,
+            } => *provided,
             _ => 0,
         }
     }

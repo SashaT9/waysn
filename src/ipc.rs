@@ -2,7 +2,7 @@ use bincode::{Decode, Encode};
 
 #[derive(Encode, Decode, Debug)]
 pub enum IpcCommand {
-    SetTemperature { kelvin: u32 },
+    SetTemperature { kelvin: u32, outputs: Vec<String> },
     GetTemperature { outputs: Vec<String> },
     Kill {},
 }

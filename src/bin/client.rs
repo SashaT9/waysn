@@ -21,9 +21,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let mut stream = UnixStream::connect(socket_path).await?;
     match action {
-        waysn::args::Action::Set { kelvin } => {
-            let _ =
-                send_message(IpcCommand::SetTemperature { kelvin: kelvin }, &mut stream).await?;
+        waysn::args::Action::Set { kelvin, outputs } => {
+            let _ = send_message(
+                IpcCommand::SetTemperature {
+                    kelvin: kelvin,
+                    outputs: outputs,
+                },
+                &mut stream,
+            )
+            .await?;
         }
         waysn::args::Action::Get { outputs } => {
             let _ =
