@@ -101,22 +101,22 @@ impl AppData {
         }
         Ok(())
     }
-    pub fn get_temperatures(&mut self, names: Vec<String>) -> Vec<(String, u32)> {
-        let mut result = Vec::new();
+    pub fn get_temperatures(&mut self, names: Vec<String>) -> HashMap<String, u32> {
+        let mut result = HashMap::new();
         if names.is_empty() {
             for (_, output_info) in self.outputs.iter() {
-                result.push((
+                result.insert(
                     output_info.output_name.clone(),
                     output_info.current_temperature,
-                ));
+                );
             }
         } else {
             for (_, output_info) in self.outputs.iter() {
                 if names.contains(&output_info.output_name) {
-                    result.push((
+                    result.insert(
                         output_info.output_name.clone(),
                         output_info.current_temperature,
-                    ));
+                    );
                 }
             }
         }
@@ -198,7 +198,6 @@ impl Dispatch<wl_output::WlOutput, u32> for AppData {
             && let Some(output_info) = state.outputs.get_mut(idx)
         {
             output_info.output_name = name;
-            println!("{}", output_info.output_name);
         }
     }
 }

@@ -1,3 +1,5 @@
+use std::{collections::HashMap, fmt};
+
 use bincode::{Decode, Encode};
 
 #[derive(Encode, Decode, Debug)]
@@ -9,7 +11,22 @@ pub enum IpcCommand {
 
 #[derive(Encode, Decode, Debug)]
 pub enum IpcResponse {
-    Temperature { temperatures: Vec<(String, u32)> },
+    Temperature { temperatures: HashMap<String, u32> },
     Ok,
     Err { message: String },
+}
+
+impl fmt::Display for IpcResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IpcResponse::Temperature { temperatures } => {
+                for (name, kelvin) in temperatures {
+                    writeln!(f, "{}: {}K", name, kelvin)?;
+                }
+                Ok(())
+            }
+            IpcResponse::Ok => writeln!(f, "Ok"),
+            IpcResponse::Err { message } => writeln!(f, "Error: {}", message),
+        }
+    }
 }

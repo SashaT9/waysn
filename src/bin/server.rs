@@ -101,12 +101,11 @@ async fn handle_connection(
     )>,
 ) -> Result<(), Box<dyn Error>> {
     let length = stream.read_u32().await?;
-    println!("{}", length);
     let mut buf = vec![0u8; length as usize];
     stream.read_exact(&mut buf).await?;
     let (cmd, _) = bincode::decode_from_slice::<IpcCommand, _>(&buf, standard())?;
     let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
-    println!("{:?}", cmd);
+    println!("Received: {:?}", cmd);
     wayland_tx.send((cmd, resp_tx))?;
     let response = resp_rx.await?;
     let data = bincode::encode_to_vec(response, standard())?;
