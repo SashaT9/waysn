@@ -5,6 +5,12 @@ Waysn is a command-line tool for adjusting screen gamma on Wayland compositors t
 * A Wayland compositor that supports the `wlr-gamma-control-unstable-v1` protocol (e.g., Sway, niri, Hyprland).
 * Rust and Cargo for building from source.
 
+## Installation
+waysn is available on the [AUR](https://aur.archlinux.org/packages/waysn):
+```
+yay -S waysn
+```
+
 ## Building from Source
 Clone this repository and run
 ```
