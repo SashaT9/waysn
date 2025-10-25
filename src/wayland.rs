@@ -31,14 +31,14 @@ impl AppData {
         }
     }
     pub fn assign_gamma_control_one(&mut self, qh: &QueueHandle<Self>, name: u32) {
-        if let Some(manager) = &self.manager {
-            if let Some(output_info) = self.outputs.get_mut(&name) {
-                if output_info.gamma_control.is_some() {
-                    return;
-                }
-                let gamma_control = manager.get_gamma_control(&output_info.output, &qh, name);
-                output_info.gamma_control = Some(gamma_control);
+        if let Some(manager) = &self.manager
+            && let Some(output_info) = self.outputs.get_mut(&name)
+        {
+            if output_info.gamma_control.is_some() {
+                return;
             }
+            let gamma_control = manager.get_gamma_control(&output_info.output, qh, name);
+            output_info.gamma_control = Some(gamma_control);
         }
     }
     pub fn assign_gamma_control_all(&mut self, qh: &QueueHandle<Self>) {
@@ -47,7 +47,7 @@ impl AppData {
                 if output_info.gamma_control.is_some() {
                     continue;
                 }
-                let gamma_control = manager.get_gamma_control(&output_info.output, &qh, *name);
+                let gamma_control = manager.get_gamma_control(&output_info.output, qh, *name);
                 output_info.gamma_control = Some(gamma_control);
             }
         }
@@ -124,6 +124,12 @@ impl AppData {
     }
 }
 
+impl Default for AppData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
     fn event(
         state: &mut Self,
@@ -145,7 +151,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
                     state.outputs.insert(
                         name,
                         OutputInfo {
-                            output: output,
+                            output,
                             output_name: String::new(),
                             gamma_control: None,
                             ramp_size: 0,
@@ -169,10 +175,10 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
                 }
             }
             wl_registry::Event::GlobalRemove { name } => {
-                if let Some(output_info) = state.outputs.remove(&name) {
-                    if let Some(gamma_control) = output_info.gamma_control {
-                        gamma_control.destroy();
-                    }
+                if let Some(output_info) = state.outputs.remove(&name)
+                    && let Some(gamma_control) = output_info.gamma_control
+                {
+                    gamma_control.destroy();
                 }
             }
             _ => {}
@@ -188,14 +194,11 @@ impl Dispatch<wl_output::WlOutput, u32> for AppData {
         _conn: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        match event {
-            wl_output::Event::Name { name } => {
-                if let Some(output_info) = state.outputs.get_mut(idx) {
-                    output_info.output_name = name;
-                    println!("{}", output_info.output_name);
-                }
-            }
-            _ => {}
+        if let wl_output::Event::Name { name } = event
+            && let Some(output_info) = state.outputs.get_mut(idx)
+        {
+            output_info.output_name = name;
+            println!("{}", output_info.output_name);
         }
     }
 }

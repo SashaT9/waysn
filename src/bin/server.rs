@@ -1,4 +1,3 @@
-use bincode;
 use bincode::config::standard;
 use std::error::Error;
 use std::os::fd::AsFd;
@@ -28,16 +27,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let (wayland_tx, mut wayland_rx) = tokio::sync::mpsc::unbounded_channel();
     tokio::spawn(async move {
         loop {
-            match listener.accept().await {
-                Ok((stream, _)) => {
-                    let wayland_tx = wayland_tx.clone();
-                    tokio::spawn(async move {
-                        if let Err(e) = handle_connection(stream, wayland_tx).await {
-                            eprintln!("{}", e);
-                        }
-                    });
-                }
-                Err(_) => {}
+            if let Ok((stream, _)) = listener.accept().await {
+                let wayland_tx = wayland_tx.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = handle_connection(stream, wayland_tx).await {
+                        eprintln!("{}", e);
+                    }
+                });
             }
         }
     });
