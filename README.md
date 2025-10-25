@@ -27,18 +27,16 @@ waysn-daemon
 Then, in a different terminal, simply pass the temperature you want to apply:
 ```
 waysn set 4000
-```
-You can also specify the outputs:
-```
+// You can also specify the outputs:
 waysn set 4000 -o eDP-1 HDMI-A-1
 ```
 If you want to get the temperatures of the outputs run:
 ```
 waysn get
-```
-You can also specify the outputs:
-```
+// You can also specify the outputs:
 waysn get eDP-1 HDMI-A-1
+// You can specify the JSON format
+waysn --json get eDP-1 HDMI-A-1
 ```
 Finally, to stop the daemon, kill it:
 ```
