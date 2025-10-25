@@ -52,8 +52,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         tokio::select! {
             Some((cmd, resp)) = wayland_rx.recv() => {
                 match cmd {
-                    IpcCommand::SetTemperature { kelvin, outputs } => {
-                        let _ = match state.apply_gamma_control(outputs, kelvin) {
+                    IpcCommand::SetTemperature { kelvin, gamma, outputs } => {
+                        let _ = match state.apply_gamma_control(outputs, kelvin, gamma) {
                             Ok(_) => resp.send(IpcResponse::Ok),
                             Err(e)  => resp.send(IpcResponse::Err { message: e.to_string() }),
                         };

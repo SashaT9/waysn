@@ -5,24 +5,34 @@ use serde::Serialize;
 
 #[derive(Encode, Decode, Debug)]
 pub enum IpcCommand {
-    SetTemperature { kelvin: u32, outputs: Vec<String> },
-    GetTemperature { outputs: Vec<String> },
+    SetTemperature {
+        kelvin: u32,
+        gamma: f32,
+        outputs: Vec<String>,
+    },
+    GetTemperature {
+        outputs: Vec<String>,
+    },
     Kill {},
 }
 
 #[derive(Encode, Decode, Debug, Serialize)]
 pub enum IpcResponse {
-    Temperature { temperatures: HashMap<String, u32> },
+    Temperature {
+        temperatures: HashMap<String, (u32, f32)>,
+    },
     Ok,
-    Err { message: String },
+    Err {
+        message: String,
+    },
 }
 
 impl fmt::Display for IpcResponse {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             IpcResponse::Temperature { temperatures } => {
-                for (name, kelvin) in temperatures {
-                    writeln!(f, "{}: {}K", name, kelvin)?;
+                for (name, (kelvin, gamma)) in temperatures {
+                    writeln!(f, "{}: {}K {}", name, kelvin, gamma)?;
                 }
                 Ok(())
             }

@@ -17,6 +17,7 @@ pub struct OutputInfo {
     gamma_control: Option<zwlr_gamma_control_v1::ZwlrGammaControlV1>,
     ramp_size: u32,
     current_temperature: u32,
+    current_gamma: f32,
 }
 pub struct AppData {
     outputs: HashMap<u32, OutputInfo>,
@@ -56,6 +57,7 @@ impl AppData {
         &mut self,
         names: Vec<String>,
         kelvin: u32,
+        gamma: f32,
     ) -> Result<(), Box<dyn Error>> {
         if names.is_empty() {
             for (_, output_info) in self.outputs.iter_mut() {
@@ -65,6 +67,7 @@ impl AppData {
                     &mut table,
                     output_info.ramp_size,
                     rgb_from_temperature(kelvin),
+                    gamma,
                 );
                 let mut f = tempfile::tempfile()?;
                 let byte_slice: &[u8] = bytemuck::cast_slice(&table);
@@ -74,6 +77,7 @@ impl AppData {
                 if let Some(gamma_control) = &output_info.gamma_control {
                     gamma_control.set_gamma(fd);
                     output_info.current_temperature = kelvin;
+                    output_info.current_gamma = gamma;
                 }
             }
         } else {
@@ -87,6 +91,7 @@ impl AppData {
                     &mut table,
                     output_info.ramp_size,
                     rgb_from_temperature(kelvin),
+                    gamma,
                 );
                 let mut f = tempfile::tempfile()?;
                 let byte_slice: &[u8] = bytemuck::cast_slice(&table);
@@ -96,18 +101,19 @@ impl AppData {
                 if let Some(gamma_control) = &output_info.gamma_control {
                     gamma_control.set_gamma(fd);
                     output_info.current_temperature = kelvin;
+                    output_info.current_gamma = gamma;
                 }
             }
         }
         Ok(())
     }
-    pub fn get_temperatures(&mut self, names: Vec<String>) -> HashMap<String, u32> {
+    pub fn get_temperatures(&mut self, names: Vec<String>) -> HashMap<String, (u32, f32)> {
         let mut result = HashMap::new();
         if names.is_empty() {
             for (_, output_info) in self.outputs.iter() {
                 result.insert(
                     output_info.output_name.clone(),
-                    output_info.current_temperature,
+                    (output_info.current_temperature, output_info.current_gamma),
                 );
             }
         } else {
@@ -115,7 +121,7 @@ impl AppData {
                 if names.contains(&output_info.output_name) {
                     result.insert(
                         output_info.output_name.clone(),
-                        output_info.current_temperature,
+                        (output_info.current_temperature, output_info.current_gamma),
                     );
                 }
             }
@@ -155,7 +161,8 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
                             output_name: String::new(),
                             gamma_control: None,
                             ramp_size: 0,
-                            current_temperature: 6500,
+                            current_temperature: 6600,
+                            current_gamma: 1.0,
                         },
                     );
                     state.assign_gamma_control_one(qh, name);
@@ -227,15 +234,17 @@ impl Dispatch<zwlr_gamma_control_v1::ZwlrGammaControlV1, u32> for AppData {
         }
     }
 }
-pub fn fill_gamma_table(table: &mut [u16], ramp_size: u32, rgb: tempergb::Color) {
-    let r_16bit = rgb.r() as u16 * 257;
-    let g_16bit = rgb.g() as u16 * 257;
-    let b_16bit = rgb.b() as u16 * 257;
+fn fill_gamma_table(table: &mut [u16], ramp_size: u32, rgb: tempergb::Color, gamma: f32) {
+    // println!("r={}, g={}, b={}", rgb.r(), rgb.g(), rgb.b());
+    let r = (rgb.r() as u16) | ((rgb.r() as u16) << 8);
+    let g = (rgb.g() as u16) | ((rgb.g() as u16) << 8);
+    let b = (rgb.b() as u16) | ((rgb.b() as u16) << 8);
     let size = ramp_size as usize;
     for i in 0..size {
-        let fraction = i as f32 / (ramp_size - 1) as f32;
-        table[i] = (r_16bit as f32 * fraction) as u16;
-        table[i + size] = (g_16bit as f32 * fraction) as u16;
-        table[i + 2 * size] = (b_16bit as f32 * fraction) as u16;
+        let mut fraction = i as f32 / (ramp_size - 1) as f32;
+        fraction = fraction.powf(gamma);
+        table[i] = (r as f32 * fraction) as u16;
+        table[i + size] = (g as f32 * fraction) as u16;
+        table[i + 2 * size] = (b as f32 * fraction) as u16;
     }
 }
