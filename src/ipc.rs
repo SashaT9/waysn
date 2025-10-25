@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt};
 
 use bincode::{Decode, Encode};
+use serde::Serialize;
 
 #[derive(Encode, Decode, Debug)]
 pub enum IpcCommand {
@@ -9,7 +10,7 @@ pub enum IpcCommand {
     Kill {},
 }
 
-#[derive(Encode, Decode, Debug)]
+#[derive(Encode, Decode, Debug, Serialize)]
 pub enum IpcResponse {
     Temperature { temperatures: HashMap<String, u32> },
     Ok,

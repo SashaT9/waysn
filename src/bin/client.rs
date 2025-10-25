@@ -13,7 +13,7 @@ use waysn::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let Args { action } = Args::parse();
+    let Args { action, json } = Args::parse();
     let xdg_runtime_path = std::env::var("XDG_RUNTIME_DIR")?;
     let wayland_display = std::env::var("WAYLAND_DISPLAY")?;
     let mut socket_path = PathBuf::from(xdg_runtime_path);
@@ -35,7 +35,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut buf = vec![0u8; length as usize];
     stream.read_exact(&mut buf).await?;
     let (response, _) = bincode::decode_from_slice::<IpcResponse, _>(&buf, standard())?;
-    print!("{}", response);
+    if json {
+        if let Ok(json_response) = match response {
+            IpcResponse::Temperature { temperatures } => serde_json::to_string(&temperatures),
+            _ => serde_json::to_string(&response),
+        } {
+            println!("{}", json_response);
+        }
+    } else {
+        print!("{}", response);
+    }
     Ok(())
 }
 

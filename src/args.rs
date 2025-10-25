@@ -5,6 +5,9 @@ use clap::{Parser, Subcommand};
 pub struct Args {
     #[command(subcommand)]
     pub action: Action,
+    /// Output in JSON format
+    #[arg(short, long, global = true)]
+    pub json: bool,
 }
 
 #[derive(Subcommand)]
