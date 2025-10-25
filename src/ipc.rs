@@ -10,4 +10,6 @@ pub enum IpcCommand {
 #[derive(Encode, Decode, Debug)]
 pub enum IpcResponse {
     Temperature { temperatures: Vec<(String, u32)> },
+    Ok,
+    Err { message: String },
 }

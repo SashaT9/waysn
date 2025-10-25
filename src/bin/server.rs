@@ -53,13 +53,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Some((cmd, resp)) = wayland_rx.recv() => {
                 match cmd {
                     IpcCommand::SetTemperature { kelvin, outputs } => {
-                        state.apply_gamma_control(outputs, kelvin)?;
+                        let _ = match state.apply_gamma_control(outputs, kelvin) {
+                            Ok(_) => resp.send(IpcResponse::Ok),
+                            Err(e)  => resp.send(IpcResponse::Err { message: e.to_string() }),
+                        };
                     },
                     IpcCommand::GetTemperature { outputs } => {
-                        let response = IpcResponse::Temperature { temperatures: state.get_temperatures(outputs) };
-                        let _ = resp.send(response);
+                        let _ = resp.send(IpcResponse::Temperature { temperatures: state.get_temperatures(outputs) });
                     },
                     IpcCommand::Kill {} => {
+                        let _ = resp.send(IpcResponse::Ok);
                         break;
                     }
                 }

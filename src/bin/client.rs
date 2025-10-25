@@ -26,16 +26,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
         waysn::args::Action::Get { outputs } => {
             send_message(IpcCommand::GetTemperature { outputs }, &mut stream).await?;
-            let length = stream.read_u32().await?;
-            let mut buf = vec![0u8; length as usize];
-            stream.read_exact(&mut buf).await?;
-            let (response, _) = bincode::decode_from_slice::<IpcResponse, _>(&buf, standard())?;
-            println!("{:?}", response);
         }
         waysn::args::Action::Kill {} => {
             send_message(IpcCommand::Kill {}, &mut stream).await?;
         }
     }
+    let length = stream.read_u32().await?;
+    let mut buf = vec![0u8; length as usize];
+    stream.read_exact(&mut buf).await?;
+    let (response, _) = bincode::decode_from_slice::<IpcResponse, _>(&buf, standard())?;
+    println!("{:?}", response);
     Ok(())
 }
 
