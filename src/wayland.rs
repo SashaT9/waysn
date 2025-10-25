@@ -210,7 +210,7 @@ fn fill_gamma_table(table: &mut [u16], ramp_size: u32, rgb: tempergb::Color, gam
     let size = ramp_size as usize;
     for i in 0..size {
         let mut fraction = i as f32 / (ramp_size - 1) as f32;
-        fraction = fraction.powf(gamma);
+        fraction = fraction.powf(1.0 / gamma);
         table[i] = (r as f32 * fraction) as u16;
         table[i + size] = (g as f32 * fraction) as u16;
         table[i + 2 * size] = (b as f32 * fraction) as u16;
